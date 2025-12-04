@@ -1,0 +1,11 @@
+# Archivos generados
+*.o
+*.s
+*.bin
+
+# Editor
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
