@@ -1,7 +1,7 @@
-# Archivos generados
+﻿# Archivos generados
 *.o
-*.s
 *.bin
+build/
 
 # Editor
 .vscode/

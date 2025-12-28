@@ -2,6 +2,17 @@
 
 Libreria de temporizacion precisa para procesadores 6502 usando el compilador cc65.
 
+## v2.0 - Optimizacion ASM
+
+**NUEVO**: Implementacion en ensamblador optimizado a mano.
+
+| Version | Implementacion | Tamano CODE |
+|---------|----------------|-------------|
+| v1.x | C (timer.c) | ~1,375 bytes |
+| **v2.0** | **ASM (timer.s)** | **~626 bytes** |
+
+**Reduccion: 54% menos codigo**
+
 ## Caracteristicas
 
 - **Delays precisos**: delay_us(), delay_ms(), delay_seconds()
@@ -9,6 +20,14 @@ Libreria de temporizacion precisa para procesadores 6502 usando el compilador cc
 - **Timer programable**: One-shot y periodico con IRQ
 - **Timeout no bloqueante**: timeout_start_ms(), timeout_expired()
 - **Cronometro**: stopwatch_start(), stopwatch_read_ms()
+- **100% compatible**: Misma interfaz C (timer.h sin cambios)
+
+## Archivos
+
+| Archivo | Descripcion |
+|---------|-------------|
+| `src/timer.h` | Interfaz C (prototipos y definiciones) |
+| `src/timer.s` | Implementacion en ensamblador 6502 |
 
 ## Hardware Requerido
 
@@ -54,7 +73,7 @@ Esta libreria requiere un modulo de timer en hardware con el siguiente mapa de m
 
 ## Instalacion
 
-1. Copiar `src/timer.h` y `src/timer.c` a tu proyecto (ej: `libs/timer/`)
+1. Copiar `src/timer.h` y `src/timer.s` a tu proyecto (ej: `libs/timer/`)
 
 2. Incluir en tu codigo:
 
@@ -80,12 +99,12 @@ TIMER_OBJ = $(BUILD_DIR)/timer.o
 OBJS = $(MAIN_OBJ) $(TIMER_OBJ) $(OTHER_OBJS)
 ```
 
-### Regla de compilacion
+### Regla de compilacion (ASM)
 
 ```makefile
-$(TIMER_OBJ): $(TIMER_DIR)/timer.c
-    $(CC65) $(CFLAGS) -I$(TIMER_DIR) -o $(BUILD_DIR)/timer.s $<
-    $(CA65) -t none -o $@ $(BUILD_DIR)/timer.s
+# Timer (version ASM optimizada)
+$(TIMER_OBJ): $(TIMER_DIR)/timer.s
+$(CA65) -t none -o $@ $<
 ```
 
 ## Uso Basico
@@ -156,6 +175,7 @@ int main(void) {
 - **Precision USEC**: ~4% (7 ticks/us vs 6.75 ideal)
 - **Rango USEC**: 32-bit (~71 minutos antes de overflow)
 - **Timer countdown**: 16-bit con prescaler 8-bit
+- **Implementacion**: Ensamblador 6502 optimizado
 
 ## Configuracion de direccion base
 
@@ -163,22 +183,6 @@ Si tu hardware usa una direccion base diferente a 0xC030, modifica en `timer.h`:
 
 ```c
 #define TIMER_BASE  0xC030  // Cambiar segun tu hardware
-```
-
-## Notas para cc65
-
-**IMPORTANTE**: Esta libreria usa variables en BSS (sin inicializacion estatica) para compatibilidad con `none.lib`.
-
-```c
-// MAL - va a DATA (puede ser ROM solo lectura)
-static uint32_t counter = 0;
-
-// BIEN - va a BSS (RAM escribible)
-static uint32_t counter;
-
-void init(void) {
-    counter = 0;  // Inicializar en codigo
-}
 ```
 
 ## Licencia
