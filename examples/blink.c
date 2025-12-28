@@ -1,6 +1,10 @@
-/**
- * Ejemplo de uso de la librería timer
- * Compilar con cc65
+﻿/**
+ * Ejemplo de uso de la libreria timer
+ * 
+ * Compilar con cc65:
+ *   ca65 -t none -o timer.o ../src/timer.s
+ *   cl65 -t none -I../src -c -o blink.o blink.c
+ *   ld65 -C tu_config.cfg -o blink.bin blink.o timer.o none.lib
  */
 
 #include <stdint.h>
