@@ -44,13 +44,28 @@ Libreria de temporizacion precisa para procesadores 6502 usando el compilador cc
 
 | Archivo | Descripción | Tamaño | Funciones |
 |---------|-------------|--------|-----------|
-| `src/timer.h` | Interfaz C (prototipos y definiciones) | - | 26 prototipos |
+| `src/timer.h` | Header completo (26 funciones) | - | 26 prototipos |
 | `src/timer.s` | Implementación completa en ASM | ~626 bytes | 26 funciones |
+| `src/timer_minimal.h` | Header minimalista (3 funciones) | - | 3 prototipos |
 | `src/timer_minimal.s` | Implementación compacta en ASM | ~150 bytes | 3 funciones |
 
 **¿Cuál usar?**
-- **timer.s**: Para programas que necesitan funcionalidad completa (IRQ, timeouts, cronómetros)
-- **timer_minimal.s**: Para ROM API, bootloaders o cuando el espacio es crítico
+
+**Opción 1: Versión completa**
+```c
+#include "timer.h"      // 26 funciones
+// Compilar con timer.s
+```
+Para programas que necesitan funcionalidad completa (IRQ, timeouts, cronómetros)
+
+**Opción 2: Versión minimal**
+```c
+#include "timer_minimal.h"  // Solo 3 funciones
+// Compilar con timer_minimal.s
+```
+Para ROM API, bootloaders o cuando el espacio es crítico
+
+**Son independientes**: Puedes elegir libremente según tus necesidades sin conflictos.
 
 ## Hardware Requerido
 
@@ -96,12 +111,22 @@ Esta libreria requiere un modulo de timer en hardware con el siguiente mapa de m
 
 ## Instalacion
 
-1. Copiar `src/timer.h` y `src/timer.s` a tu proyecto (ej: `libs/timer/`)
+**Opción 1: Versión completa (recomendado)**
 
-2. Incluir en tu codigo:
+1. Copiar `src/timer.h` y `src/timer.s` a tu proyecto
 
+2. Incluir en tu código:
 ```c
 #include "timer.h"
+```
+
+**Opción 2: Versión minimal (espacio limitado)**
+
+1. Copiar `src/timer_minimal.h` y `src/timer_minimal.s` a tu proyecto
+
+2. Incluir en tu código:
+```c
+#include "timer_minimal.h"
 ```
 
 ## Configuracion del Makefile
@@ -163,10 +188,7 @@ int main(void) {
 ### Con versión minimal (timer_minimal.s)
 
 ```c
-// Solo declara las 3 funciones disponibles
-uint32_t get_micros(void);
-void delay_us(uint16_t us);
-void delay_ms(uint16_t ms);
+#include "timer_minimal.h"  // Header con solo 3 funciones
 
 int main(void) {
     while (1) {
