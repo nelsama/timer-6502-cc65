@@ -6,12 +6,30 @@ Libreria de temporizacion precisa para procesadores 6502 usando el compilador cc
 
 **NUEVO**: Implementacion en ensamblador optimizado a mano.
 
-| Version | Implementacion | Tamano CODE |
-|---------|----------------|-------------|
-| v1.x | C (timer.c) | ~1,375 bytes |
-| **v2.0** | **ASM (timer.s)** | **~626 bytes** |
+| Version | Implementacion | Tamano CODE | Funciones |
+|---------|----------------|-------------|-----------|
+| v1.x | C (timer.c) | ~1,375 bytes | 26 funciones |
+| **v2.0** | **ASM (timer.s)** | **~626 bytes** | **26 funciones** |
+| **v2.1** | **ASM Minimal (timer_minimal.s)** | **~150 bytes** | **3 funciones** |
 
-**Reduccion: 54% menos codigo**
+**Reducción v2.0**: 54% menos código  
+**Reducción v2.1**: 89% menos código (ideal para ROM API)
+
+## Versiones Disponibles
+
+### timer.s - Version Completa (Recomendado)
+- ✅ 26 funciones completas
+- ✅ Delays, contadores, timers, IRQ, timeouts, cronómetros
+- ✅ 626 bytes de código
+- **Uso**: Programas complejos que necesitan control total del timer
+
+### timer_minimal.s - Version Compacta (Nuevo v2.1)
+- ✅ Solo 3 funciones esenciales:
+  - `get_micros()` - Leer microsegundos
+  - `delay_us(us)` - Delay en microsegundos
+  - `delay_ms(ms)` - Delay en milisegundos
+- ✅ ~150 bytes de código
+- **Uso**: ROM API, bootloaders, programas con espacio limitado
 
 ## Caracteristicas
 
@@ -24,10 +42,15 @@ Libreria de temporizacion precisa para procesadores 6502 usando el compilador cc
 
 ## Archivos
 
-| Archivo | Descripcion |
-|---------|-------------|
-| `src/timer.h` | Interfaz C (prototipos y definiciones) |
-| `src/timer.s` | Implementacion en ensamblador 6502 |
+| Archivo | Descripción | Tamaño | Funciones |
+|---------|-------------|--------|-----------|
+| `src/timer.h` | Interfaz C (prototipos y definiciones) | - | 26 prototipos |
+| `src/timer.s` | Implementación completa en ASM | ~626 bytes | 26 funciones |
+| `src/timer_minimal.s` | Implementación compacta en ASM | ~150 bytes | 3 funciones |
+
+**¿Cuál usar?**
+- **timer.s**: Para programas que necesitan funcionalidad completa (IRQ, timeouts, cronómetros)
+- **timer_minimal.s**: Para ROM API, bootloaders o cuando el espacio es crítico
 
 ## Hardware Requerido
 
@@ -99,15 +122,25 @@ TIMER_OBJ = $(BUILD_DIR)/timer.o
 OBJS = $(MAIN_OBJ) $(TIMER_OBJ) $(OTHER_OBJS)
 ```
 
-### Regla de compilacion (ASM)
+### Regla de compilacion
 
+**Opción 1: Version completa (timer.s)**
 ```makefile
-# Timer (version ASM optimizada)
+# Timer completo (26 funciones, ~626 bytes)
 $(TIMER_OBJ): $(TIMER_DIR)/timer.s
-$(CA65) -t none -o $@ $<
+	$(CA65) -t none -o $@ $<
+```
+
+**Opción 2: Version minimal (timer_minimal.s)**
+```makefile
+# Timer minimal (3 funciones, ~150 bytes)
+$(TIMER_OBJ): $(TIMER_DIR)/timer_minimal.s
+	$(CA65) -t none -o $@ $<
 ```
 
 ## Uso Basico
+
+### Con versión completa (timer.s)
 
 ```c
 #include "timer.h"
@@ -127,24 +160,63 @@ int main(void) {
 }
 ```
 
+### Con versión minimal (timer_minimal.s)
+
+```c
+// Solo declara las 3 funciones disponibles
+uint32_t get_micros(void);
+void delay_us(uint16_t us);
+void delay_ms(uint16_t ms);
+
+int main(void) {
+    while (1) {
+        delay_ms(100);  // Esperar 100ms
+        
+        // O medir tiempo
+        uint32_t start = get_micros();
+        // ... código ...
+        uint32_t elapsed = get_micros() - start;
+    }
+}
+```
+
+### Desde ROM API
+
+Si el timer está en ROM API (ej: Monitor 6502):
+
+```c
+#define ROMAPI_GET_MICROS   0xBF2D
+#define ROMAPI_DELAY_US     0xBF30
+#define ROMAPI_DELAY_MS     0xBF33
+
+#define rom_get_micros()    (((uint32_t (*)(void))ROMAPI_GET_MICROS)())
+#define rom_delay_us(us)    (((void (*)(uint16_t))ROMAPI_DELAY_US)(us))
+#define rom_delay_ms(ms)    (((void (*)(uint16_t))ROMAPI_DELAY_MS)(ms))
+
+// Usar directamente
+rom_delay_ms(100);
+```
+
 ## API Reference
 
-### Inicializacion
+### Funciones en timer.s (Completo)
+
+#### Inicializacion
 - `void timer_init(void)` - Inicializa el timer, resetea contadores
 
-### Delays (bloqueantes)
-- `void delay_us(uint16_t us)` - Delay en microsegundos
-- `void delay_ms(uint16_t ms)` - Delay en milisegundos
+#### Delays (bloqueantes)
+- `void delay_us(uint16_t us)` - Delay en microsegundos ⭐
+- `void delay_ms(uint16_t ms)` - Delay en milisegundos ⭐
 - `void delay_seconds(uint16_t s)` - Delay en segundos
 
-### Contadores de tiempo
+#### Contadores de tiempo
 - `uint32_t get_ticks(void)` - Ticks desde reset
-- `uint32_t get_micros(void)` - Microsegundos desde reset
+- `uint32_t get_micros(void)` - Microsegundos desde reset ⭐
 - `uint32_t get_millis(void)` - Milisegundos desde reset
 - `void reset_ticks(void)` - Resetear contador ticks
 - `void reset_micros(void)` - Resetear contador microsegundos
 
-### Timer programable
+#### Timer programable
 - `void timer_set_oneshot(uint16_t ticks, uint8_t prescaler)` - Timer unico
 - `void timer_set_periodic(uint16_t ticks, uint8_t prescaler)` - Timer repetitivo
 - `void timer_set_ms(uint16_t ms)` - Timer en milisegundos
@@ -153,21 +225,29 @@ int main(void) {
 - `uint8_t timer_expired(void)` - Timer expiro?
 - `uint16_t timer_read(void)` - Leer valor actual
 
-### IRQ
+#### IRQ
 - `void timer_enable_irq(void)` - Habilitar IRQ
 - `void timer_disable_irq(void)` - Deshabilitar IRQ
 - `uint8_t timer_irq_pending(void)` - IRQ pendiente?
 - `void timer_clear_irq(void)` - Limpiar flag IRQ
 
-### Timeout (no bloqueante)
+#### Timeout (no bloqueante)
 - `void timeout_start_us(uint32_t us)` - Iniciar timeout
 - `void timeout_start_ms(uint16_t ms)` - Iniciar timeout
 - `uint8_t timeout_expired(void)` - Timeout expiro?
 
-### Cronometro
+#### Cronometro
 - `void stopwatch_start(void)` - Iniciar cronometro
 - `uint32_t stopwatch_read_us(void)` - Leer en microsegundos
 - `uint16_t stopwatch_read_ms(void)` - Leer en milisegundos
+
+⭐ = Disponible en timer_minimal.s
+
+### Funciones en timer_minimal.s (Solo 3)
+
+- `uint32_t get_micros(void)` - Leer microsegundos (32-bit)
+- `void delay_us(uint16_t us)` - Delay en microsegundos
+- `void delay_ms(uint16_t ms)` - Delay en milisegundos
 
 ## Especificaciones
 
