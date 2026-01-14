@@ -42,6 +42,7 @@ LATCH_USEC      = $02
 .segment    "ZEROPAGE": zeropage
 
 delay_target:       .res 4      ; Target para delays
+current_time:       .res 2      ; Temp para valores actuales (byte0, byte1)
 
 ; ============================================
 ; CÓDIGO
@@ -59,14 +60,16 @@ delay_target:       .res 4      ; Target para delays
     sta     TIMER_LATCH_CTL
     
     ; Leer 32 bits (little-endian)
-    lda     TIMER_USEC_0        ; LSB
-    ldx     TIMER_USEC_1
-    sta     sreg                ; sreg = low word
-    stx     sreg+1
+    ; Primero leer bytes 2 y 3 (high word)
+    lda     TIMER_USEC_2
+    sta     sreg
+    lda     TIMER_USEC_3
+    sta     sreg+1
     
-    lda     TIMER_USEC_2        ; MSB
-    ldx     TIMER_USEC_3
-    rts                         ; Retorna en sreg:X:A
+    ; Luego leer bytes 0 y 1 (low word) en A y X
+    lda     TIMER_USEC_0        ; LSB -> A
+    ldx     TIMER_USEC_1        ; byte 1 -> X
+    rts                         ; Retorna en sreg:X:A (byte3:byte2:byte1:byte0)
 .endproc
 
 ; --------------------------------------------
@@ -108,9 +111,9 @@ delay_target:       .res 4      ; Target para delays
     ; get_micros retorna: A=byte0(LSB), X=byte1, sreg=byte2, sreg+1=byte3(MSB)
     ; Comparar con target (32-bit): current >= target?
     
-    ; Guardar valores actuales
-    sta     ptr1                ; current byte 0
-    stx     ptr1+1              ; current byte 1
+    ; Guardar valores actuales en variable temporal
+    sta     current_time        ; current byte 0
+    stx     current_time+1      ; current byte 1
     
     ; Comparar byte 3 (MSB) primero
     lda     sreg+1
@@ -125,13 +128,13 @@ delay_target:       .res 4      ; Target para delays
     bne     @done
     
     ; Byte 2 igual, comparar byte 1
-    lda     ptr1+1
+    lda     current_time+1
     cmp     delay_target+1
     bcc     @wait_loop
     bne     @done
     
     ; Byte 1 igual, comparar byte 0 (LSB)
-    lda     ptr1
+    lda     current_time
     cmp     delay_target
     bcc     @wait_loop
     
@@ -142,7 +145,7 @@ delay_target:       .res 4      ; Target para delays
 ; --------------------------------------------
 ; delay_ms - Delay en milisegundos
 ; Entrada: uint16_t ms en X:A
-; Implementación: ms * 1000 = us
+; Implementación directa con menos overhead
 ; --------------------------------------------
 .proc _delay_ms
     ; Guardar ms
@@ -153,23 +156,75 @@ delay_target:       .res 4      ; Target para delays
     ora     ptr1+1
     beq     @done
     
-@ms_loop:
-    ; delay_us(1000)
-    lda     #<1000
-    ldx     #>1000
-    jsr     _delay_us
+    ; Leer tiempo inicial
+    jsr     _get_micros
+    
+    ; Guardar en delay_target (bytes 0-3)
+    sta     delay_target
+    stx     delay_target+1
+    lda     sreg
+    sta     delay_target+2
+    lda     sreg+1
+    sta     delay_target+3
+    
+@add_1ms:
+    ; Sumar 1000 ($03E8) microsegundos al target
+    lda     delay_target
+    clc
+    adc     #$E8            ; Low byte de 1000
+    sta     delay_target
+    lda     delay_target+1
+    adc     #$03            ; High byte de 1000
+    sta     delay_target+1
+    lda     delay_target+2
+    adc     #0
+    sta     delay_target+2
+    lda     delay_target+3
+    adc     #0
+    sta     delay_target+3
     
     ; Decrementar contador ms
     lda     ptr1
-    bne     @dec_low
+    bne     @no_borrow
     dec     ptr1+1
-@dec_low:
+@no_borrow:
     dec     ptr1
     
-    ; Verificar si terminamos
+    ; Verificar si quedan ms por procesar
     lda     ptr1
     ora     ptr1+1
-    bne     @ms_loop
+    bne     @add_1ms
+    
+@wait_loop:
+    ; Leer tiempo actual
+    jsr     _get_micros
+    
+    ; Guardar valores actuales
+    sta     current_time
+    stx     current_time+1
+    
+    ; Comparar byte 3 (MSB) primero
+    lda     sreg+1
+    cmp     delay_target+3
+    bcc     @wait_loop
+    bne     @done
+    
+    ; Byte 3 igual, comparar byte 2
+    lda     sreg
+    cmp     delay_target+2
+    bcc     @wait_loop
+    bne     @done
+    
+    ; Byte 2 igual, comparar byte 1
+    lda     current_time+1
+    cmp     delay_target+1
+    bcc     @wait_loop
+    bne     @done
+    
+    ; Byte 1 igual, comparar byte 0 (LSB)
+    lda     current_time
+    cmp     delay_target
+    bcc     @wait_loop
     
 @done:
     rts
